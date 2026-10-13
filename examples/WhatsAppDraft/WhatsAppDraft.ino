@@ -16,8 +16,8 @@ const GroqReasoning::ContactMapping CONTACT_MAP[] = {
 };
 
 const GroqReasoning::ContactNumberMapping CONTACT_PHONE_MAP[] = {
-  {"Mom", "+910000000000"},
-  {"Nurse", "+910000000000"}
+  {"Mom", "+919876543210"},
+  {"Nurse", "+919876543211"}
 };
 
 const size_t DEVICE_COUNT = sizeof(DEVICE_MAP) / sizeof(DEVICE_MAP[0]);
