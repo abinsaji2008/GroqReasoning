@@ -614,9 +614,9 @@ bool GroqReasoning::sendWhatsAppMessage(
     draft.error = lastError_;
     return false;
   }
-  if (config.apiUrl == nullptr || config.apiUrl[0] == '\\0' ||
-      config.instance == nullptr || config.instance[0] == '\\0' ||
-      config.apiKey == nullptr || config.apiKey[0] == '\\0') {
+  if (config.apiUrl == nullptr || config.apiUrl[0] == '\0' ||
+      config.instance == nullptr || config.instance[0] == '\0' ||
+      config.apiKey == nullptr || config.apiKey[0] == '\0') {
     lastError_ = "Evolution API URL, instance, or API key is missing.";
     draft.error = lastError_;
     return false;
