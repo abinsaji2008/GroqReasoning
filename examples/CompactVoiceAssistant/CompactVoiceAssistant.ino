@@ -14,6 +14,16 @@
   #define DBG(...) do {} while (0)
 #endif
 
+#ifndef SEED_EVOLUTION_API_URL
+#define SEED_EVOLUTION_API_URL ""
+#endif
+#ifndef SEED_EVOLUTION_INSTANCE
+#define SEED_EVOLUTION_INSTANCE ""
+#endif
+#ifndef SEED_EVOLUTION_API_KEY
+#define SEED_EVOLUTION_API_KEY ""
+#endif
+
 #define MIC_SD_PIN  16
 #define MIC_SCK_PIN 17
 #define MIC_WS_PIN  15
@@ -28,8 +38,8 @@ const GroqReasoning::DeviceMapping DEVICES[] = {
 };
 
 const GroqReasoning::ContactMapping CONTACTS[] = {
-  {"Mom", "mother|mom|amma", "+918086999662"},
-  {"Nurse", "nurse|care nurse", "+918086999662"}
+  {"Mom", "mother|mom|amma", "+918000000001"},
+  {"Nurse", "nurse|care nurse", "+918000000002"}
 };
 
 const GroqReasoning::WhatsAppConfig WHATSAPP = {
@@ -88,6 +98,7 @@ void setup() {
   audioConfig.sdPin = MIC_SD_PIN;
   audioConfig.sckPin = MIC_SCK_PIN;
   audioConfig.wsPin = MIC_WS_PIN;
+  audioConfig.debugOutput = DEBUG_MODE;
   groqAudio.setConfig(audioConfig);
   audioReady = groqAudio.begin(STT_URL, SEED_GROQ_KEY, STT_MODEL, "en");
   DBG("[STT] %s\n", audioReady ? "ready" : "failed");
