@@ -1,11 +1,11 @@
-# GroqReasoning v1.4.7
+# GroqReasoning v1.4.8
 
 An ESP32 Arduino library that sends a transcript to Groq and returns a JSON object with exactly two string fields:
 
 - `response`: a short user-facing answer.
 - `action`: a validated intent such as `l1on`, `f1off`, `refill_water`, `emergency_call`, `call:Nurse`, or `none`.
 
-The library does not execute device actions, start a pump, or place phone calls. The main sketch owns device/contact arrays and decides what to do with the validated intent. It can generate AI-written WhatsApp drafts and submit text messages through a configured Evolution API instance.
+The main sketch can stay small: WakeNet9 triggers `GroqAudioStream` transcription, then `GroqReasoning::processTranscript()` routes the transcript to AI reasoning or WhatsApp. The library manages the current IST time context and persistent scheduled WhatsApp delivery. Hardware-specific device actions still remain in the firmware.
 
 
 ## Install in Arduino IDE
@@ -45,45 +45,38 @@ Example result:
 {"response":"Turning on the primary light.","action":"l1on"}
 ```
 
-## Contacts: name and aliases only
+## Combined contact mapping
 
-The contact mapping now has **only two fields**: canonical contact name and alternative names. No phone number belongs in this array.
+Name, aliases, and WhatsApp number can live in one entry:
 
 ```cpp
-const GroqReasoning::ContactMapping CONTACT_MAP[] = {
-  {"Mom", "mother|mom|amma"},
-  {"Nurse", "nurse|care nurse"}
+const GroqReasoning::ContactMapping CONTACTS[] = {
+  {"Mom", "mother|mom|amma", "+918000000001"},
+  {"Nurse", "nurse|care nurse", "+918000000002"}
 };
 ```
 
-Aliases are separated with `|`. The library sends contact names and aliases to Groq so it can select a canonical name. After the reply, the library validates `call:<name>` against this list:
+Aliases are separated by `|`. Keep phone numbers in international format. The number is used locally by the library and is not sent to Groq in the prompt.
 
-- Known name or alias: action is normalized to `call:<canonical name>`.
-- Unknown person: `action` becomes `none` and the response says the person is not in the contact list.
+## Compact workflow example
 
-Phone-number lookup and call execution are not implemented here. They can be added later in the ESP32 firmware using the returned canonical contact name.
-
-## Example usage
+See `examples/CompactVoiceAssistant/CompactVoiceAssistant.ino`. Its request path is intentionally short:
 
 ```cpp
-GroqReasoning reasoning;
-reasoning.begin(SEED_GROQ_KEY);
-
-GroqReasoning::Result result = reasoning.ask(
-    transcript,
-    DEVICE_MAP,
-    sizeof(DEVICE_MAP) / sizeof(DEVICE_MAP[0]),
-    CONTACT_MAP,
-    sizeof(CONTACT_MAP) / sizeof(CONTACT_MAP[0])
+String transcript = groqAudio.transcribe();
+GroqReasoning::Result result = reasoning.processTranscript(
+  transcript, DEVICES, DEVICE_COUNT, CONTACTS, CONTACT_COUNT, WHATSAPP
 );
-
 Serial.println(result.toJson());
 ```
+
+The `processTranscript()` method routes ordinary questions through `ask()`, generates and sends WhatsApp messages, handles scheduled delivery, and passes the synchronized IST timestamp to Groq. `serviceScheduledMessages()` should be called regularly from `loop()`.
 
 ## Requirements
 
 - ESP32 Arduino core 3.x recommended.
 - `ArduinoJson` library.
+- `WakeNet9Arduino` and `GroqAudioStream` for the compact voice example.
 - Wi-Fi connected by the main sketch.
 
 
