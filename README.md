@@ -1,11 +1,11 @@
-# GroqReasoning v1.3.0
+# GroqReasoning v1.4.0
 
 An ESP32 Arduino library that sends a transcript to Groq and returns a JSON object with exactly two string fields:
 
 - `response`: a short user-facing answer.
 - `action`: a validated intent such as `l1on`, `f1off`, `refill_water`, `emergency_call`, `call:Nurse`, or `none`.
 
-The library does not execute device actions, start a pump, or place phone calls. The main sketch owns device/contact arrays and decides what to do with the validated intent.
+The library does not execute device actions, start a pump, or place phone calls. The main sketch owns device/contact arrays and decides what to do with the validated intent. It can generate AI-written WhatsApp drafts and submit text messages through a configured Evolution API instance.
 
 
 ## Install in Arduino IDE
@@ -89,7 +89,7 @@ Serial.println(result.toJson());
 
 ## WhatsApp message drafts
 
-The library can prepare WhatsApp drafts through `generateWhatsAppDraft()`. It returns the selected canonical contact, validated phone number, and message text. It **does not send** the WhatsApp message; your firmware or backend must handle sending after applying your own confirmation and safety checks.
+The library can prepare WhatsApp drafts through `generateWhatsAppDraft()`. It returns the selected canonical contact, validated phone number, and message text. Use `sendWhatsAppMessage()` to submit a ready draft to Evolution API. A successful HTTP response means the API accepted the request, not necessarily that the recipient received it.
 
 Phone numbers are passed separately in firmware and are not sent to Groq.
 
@@ -110,6 +110,26 @@ bool ok = reasoning.generateWhatsAppDraft(
 );
 
 Serial.println(draft.toJson());
+
+GroqReasoning::WhatsAppConfig waConfig = {
+  SEED_EVOLUTION_API_URL,
+  SEED_EVOLUTION_INSTANCE,
+  SEED_EVOLUTION_API_KEY
+};
+
+if (ok && draft.send) {
+  bool submitted = reasoning.sendWhatsAppMessage(draft, waConfig);
+  Serial.println(submitted ? "Evolution API accepted the request" :
+                             reasoning.lastError());
+}
+```
+
+Add these settings to your local `secrets.h` and replace the placeholders:
+
+```cpp
+#define SEED_EVOLUTION_API_URL "https://your-evolution-api-host"
+#define SEED_EVOLUTION_INSTANCE "your-instance-name"
+#define SEED_EVOLUTION_API_KEY "your-evolution-api-key"
 ```
 
 Replace the example phone numbers with the intended recipients' numbers. The included example is `examples/WhatsAppDraft/WhatsAppDraft.ino`.
@@ -117,3 +137,12 @@ Replace the example phone numbers with the intended recipients' numbers. The inc
 ## Security
 
 This development build uses `WiFiClientSecure::setInsecure()`, which disables TLS certificate verification. Configure CA verification before production use. Do not execute model output directly: continue validating actions in firmware.
+
+
+## Evolution API send endpoint
+
+The library submits text messages with `POST /message/sendText/{instance}`, using the `apikey` request header and a JSON body containing `number` and `text`. Phone numbers are sent as digits with the country code, without a leading plus sign.
+
+A successful 2xx response sets `draft.submitted=true`. This indicates that the Evolution API returned success for the request; it is not a guarantee of final WhatsApp delivery.
+
+The HTTPS client currently uses `setInsecure()` for development. Configure certificate validation before production use.
