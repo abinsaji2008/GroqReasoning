@@ -362,13 +362,13 @@ bool GroqReasoning::looksLikeWhatsAppRequest(
   bool knownContact = false;
   if (contacts != nullptr) {
     for (size_t i = 0; i < contactCount && !knownContact; ++i) {
-      if (contacts[i].name != nullptr && contacts[i].name[0] != '\\0' &&
+      if (contacts[i].name != nullptr && contacts[i].name[0] != '\0' &&
           text.indexOf(normalizedName(String(contacts[i].name))) >= 0) {
         knownContact = true;
         break;
       }
 
-      if (contacts[i].aliases == nullptr || contacts[i].aliases[0] == '\\0') continue;
+      if (contacts[i].aliases == nullptr || contacts[i].aliases[0] == '\0') continue;
       String aliases(contacts[i].aliases);
       int start = 0;
       while (start <= aliases.length()) {
