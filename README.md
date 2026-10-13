@@ -1,4 +1,4 @@
-# GroqReasoning v1.4.4
+# GroqReasoning v1.4.5
 
 An ESP32 Arduino library that sends a transcript to Groq and returns a JSON object with exactly two string fields:
 
@@ -164,7 +164,7 @@ The prototype uses `WiFiClientSecure::setInsecure()`; configure TLS certificate 
 
 ### Compatibility with older sketches
 
-Version 1.4.4 keeps compatibility overloads for sketches using `ContactPhoneMapping`, `begin(apiKey, model)`, `looksLikeWhatsAppRequest(transcript)`, and the four-argument `sendWhatsAppMessage(draft, apiBaseUrl, instanceName, apiKey)` form. Replace both `src/GroqReasoning.h` and `src/GroqReasoning.cpp` together when updating the library; mixing files from different versions can cause linker errors.
+Version 1.4.5 keeps compatibility overloads for sketches using `ContactPhoneMapping`, `begin(apiKey, model)`, `looksLikeWhatsAppRequest(transcript)`, and the four-argument `sendWhatsAppMessage(draft, apiBaseUrl, instanceName, apiKey)` form. Replace both `src/GroqReasoning.h` and `src/GroqReasoning.cpp` together when updating the library; mixing files from different versions can cause linker errors.
 
 ### Groq GPT-OSS compatibility
 
@@ -174,3 +174,7 @@ For `openai/gpt-oss-20b`, the library sets `include_reasoning=false` rather than
 
 Version 1.4.4 uses Groq Structured Outputs with `json_schema` and `strict: true` for both reasoning intents and WhatsApp drafts. It also sets `reasoning_effort=low` and `include_reasoning=false` for draft generation. When Groq returns an API error, `lastError()` includes the `failed_generation` details when the API provides them.
 When the user requests a message without clearly dictating what it should say, the library now avoids inventing message content and leaves sending disabled so the voice assistant can ask for the intended text.
+
+### WhatsApp intent handling
+
+The ESP32-S3 example checks for a WhatsApp request before normal intent routing, preventing phrases such as “send it to my mother” from being classified as phone-call actions. The draft prompt includes examples for “send hi to my mother” and for sending a preceding sentence when the user says “send it”. If no message text was spoken, the example asks for the message instead of sending an invented greeting.
