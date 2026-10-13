@@ -87,6 +87,13 @@ public:
                              WhatsAppDraft &draft,
                              const char *currentDateTime = nullptr);
 
+  // Convenience overload: phone number is stored alongside each contact.
+  bool generateWhatsAppDraft(const String &transcript,
+                             const ContactMapping *contacts,
+                             size_t contactCount,
+                             WhatsAppDraft &draft,
+                             const char *currentDateTime = nullptr);
+
   // End-to-end voice request routing: WhatsApp, scheduling, or normal Groq reasoning.
   Result processTranscript(const String &transcript,
                            const DeviceMapping *devices,
