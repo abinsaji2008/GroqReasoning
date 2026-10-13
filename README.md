@@ -7,6 +7,16 @@ An ESP32 Arduino library that sends a transcript to Groq and returns a JSON obje
 
 The library does not execute device actions, start a pump, or place phone calls. The main sketch owns device/contact arrays and decides what to do with the validated intent.
 
+
+## Install in Arduino IDE
+
+1. Open this repository on GitHub and choose **Code → Download ZIP**.
+2. In Arduino IDE, select **Sketch → Include Library → Add .ZIP Library…** and choose the downloaded ZIP.
+3. Install the **ArduinoJson** dependency when prompted. Select an ESP32 board and compile one of the examples.
+
+Copy the relevant `secrets.h.example` to `secrets.h` in the example folder, then enter your own Wi-Fi credentials and Groq API key.
+
+
 ## Built-in defaults
 
 - Endpoint: `https://api.groq.com/openai/v1/chat/completions`
