@@ -339,7 +339,10 @@ String GroqReasoning::WhatsAppDraft::toJson() const {
   return json;
 }
 
-bool GroqReasoning::looksLikeWhatsAppRequest(const String &transcript) const {
+bool GroqReasoning::looksLikeWhatsAppRequest(
+    const String &transcript,
+    const ContactMapping *contacts,
+    size_t contactCount) const {
   String text = transcript;
   text.toLowerCase();
 
@@ -356,7 +359,33 @@ bool GroqReasoning::looksLikeWhatsAppRequest(const String &transcript) const {
       text.indexOf("write to ") >= 0 ||
       text.indexOf("let ") >= 0;
 
-  return explicitMessage || sendVerb;
+  bool knownContact = false;
+  if (contacts != nullptr) {
+    for (size_t i = 0; i < contactCount && !knownContact; ++i) {
+      if (contacts[i].name != nullptr && contacts[i].name[0] != '\\0' &&
+          text.indexOf(normalizedName(String(contacts[i].name))) >= 0) {
+        knownContact = true;
+        break;
+      }
+
+      if (contacts[i].aliases == nullptr || contacts[i].aliases[0] == '\\0') continue;
+      String aliases(contacts[i].aliases);
+      int start = 0;
+      while (start <= aliases.length()) {
+        int separator = aliases.indexOf('|', start);
+        if (separator < 0) separator = aliases.length();
+        String alias = normalizedName(aliases.substring(start, separator));
+        if (!alias.isEmpty() && text.indexOf(alias) >= 0) {
+          knownContact = true;
+          break;
+        }
+        if (separator >= aliases.length()) break;
+        start = separator + 1;
+      }
+    }
+  }
+
+  return explicitMessage || (sendVerb && knownContact);
 }
 
 bool GroqReasoning::generateWhatsAppDraft(
