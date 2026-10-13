@@ -1,4 +1,4 @@
-# GroqReasoning v1.4.1
+# GroqReasoning v1.4.2
 
 An ESP32 Arduino library that sends a transcript to Groq and returns a JSON object with exactly two string fields:
 
@@ -22,7 +22,7 @@ Copy the relevant `secrets.h.example` to `secrets.h` in the example folder, then
 - Endpoint: `https://api.groq.com/openai/v1/chat/completions`
 - Model: `openai/gpt-oss-20b`
 - Reasoning effort: `low`
-- Reasoning format: `hidden`
+- Include reasoning content: disabled
 - JSON response mode: enabled
 - Maximum completion tokens: `256`
 - Connect timeout: `10 seconds`
@@ -164,7 +164,7 @@ The prototype uses `WiFiClientSecure::setInsecure()`; configure TLS certificate 
 
 ### Compatibility with older sketches
 
-Version 1.4.1 keeps compatibility overloads for sketches using `ContactPhoneMapping`, `begin(apiKey, model)`, `looksLikeWhatsAppRequest(transcript)`, and the four-argument `sendWhatsAppMessage(draft, apiBaseUrl, instanceName, apiKey)` form. Replace both `src/GroqReasoning.h` and `src/GroqReasoning.cpp` together when updating the library; mixing files from different versions can cause linker errors.
+Version 1.4.2 keeps compatibility overloads for sketches using `ContactPhoneMapping`, `begin(apiKey, model)`, `looksLikeWhatsAppRequest(transcript)`, and the four-argument `sendWhatsAppMessage(draft, apiBaseUrl, instanceName, apiKey)` form. Replace both `src/GroqReasoning.h` and `src/GroqReasoning.cpp` together when updating the library; mixing files from different versions can cause linker errors.
 
 ### Groq GPT-OSS compatibility
 
