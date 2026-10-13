@@ -20,7 +20,7 @@ The library does not execute device actions, start a pump, or place phone calls.
 
 ## Device actions
 
-Define device mappings in the main sketch. Each base code permits only <code>on</code> and <code>off> actions.
+Define device mappings in the main sketch. Each base code permits only <code>on</code> and <code>off</code> actions.
 
 ~~~cpp
 const GroqReasoning::DeviceMapping DEVICE_MAP[] = {
