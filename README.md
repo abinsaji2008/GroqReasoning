@@ -146,3 +146,18 @@ The library submits text messages with `POST /message/sendText/{instance}`, usin
 A successful 2xx response sets `draft.submitted=true`. This indicates that the Evolution API returned success for the request; it is not a guarantee of final WhatsApp delivery.
 
 The HTTPS client currently uses `setInsecure()` for development. Configure certificate validation before production use.
+
+
+## ESP32-S3 Voice Assistant
+
+An end-to-end WakeNet9 + Groq Whisper + GroqReasoning + Evolution API example is included at `examples/ESP32S3VoiceAssistant/ESP32S3VoiceAssistant.ino`.
+
+The sketch connects Wi-Fi at the start of `setup()`, starts WakeNet9 on the configured INMP441 pins, transcribes speech, returns a JSON object containing `response`, `action`, and `message`, and submits requested WhatsApp messages through Evolution API.
+
+Copy `examples/ESP32S3VoiceAssistant/secrets.h.example` to a private `secrets.h` and enter your Wi-Fi, Groq, and Evolution API credentials. Edit `CONTACT_PHONE_MAP` in the sketch to configure your recipients. Phone numbers and credentials are intentionally placeholders in the public repository.
+
+Required additional libraries for this example: `WakeNet9Arduino` and `GroqAudioStream`.
+
+Evolution API submission uses `POST {base URL}/message/sendText/{instance}` with the `apikey` header and JSON fields `number` and `text`. The number is sent as digits including its country code, without a leading plus. A successful 2xx response means the API accepted the request; final WhatsApp delivery should be checked using your server's status/webhook flow.
+
+The prototype uses `WiFiClientSecure::setInsecure()`; configure TLS certificate verification before production use.
