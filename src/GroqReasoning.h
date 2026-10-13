@@ -33,6 +33,8 @@ public:
     String text;
     String error;
     String apiStatus;
+    bool scheduled = false;
+    String scheduledFor;
     String toJson() const;
   };
 
