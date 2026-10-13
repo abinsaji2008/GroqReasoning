@@ -23,7 +23,7 @@ Copy the relevant `secrets.h.example` to `secrets.h` in the example folder, then
 - Model: `openai/gpt-oss-20b`
 - Reasoning effort: `low`
 - Include reasoning content: disabled
-- JSON response mode: enabled
+- Strict JSON Schema output: enabled for intent and WhatsApp draft responses
 - Maximum completion tokens: `256`
 - Connect timeout: `10 seconds`
 - Request timeout: `30 seconds`
@@ -169,3 +169,7 @@ Version 1.4.2 keeps compatibility overloads for sketches using `ContactPhoneMapp
 ### Groq GPT-OSS compatibility
 
 For `openai/gpt-oss-20b`, the library sets `include_reasoning=false` rather than passing `reasoning_format`, which the current Groq documentation lists as unsupported for GPT-OSS models. The voice-assistant example also prints the Groq HTTP status and error details to Serial when a request fails.
+
+### Strict JSON output and validation diagnostics
+
+Version 1.4.3 uses Groq Structured Outputs with `json_schema` and `strict: true` for both reasoning intents and WhatsApp drafts. It also sets `reasoning_effort=low` and `include_reasoning=false` for draft generation. When Groq returns an API error, `lastError()` includes the `failed_generation` details when the API provides them.
