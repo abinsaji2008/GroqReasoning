@@ -601,3 +601,107 @@ bool GroqReasoning::generateWhatsAppDraft(
   return true;
 }
 
+bool GroqReasoning::sendWhatsAppMessage(
+    WhatsAppDraft &draft,
+    const WhatsAppConfig &config) {
+  draft.submitted = false;
+  lastError_ = "";
+  lastHttpCode_ = 0;
+
+  if (!draft.send || draft.number.isEmpty() || draft.text.isEmpty()) {
+    lastError_ = "WhatsApp draft is not ready to send.";
+    draft.error = lastError_;
+    return false;
+  }
+  if (config.apiUrl == nullptr || config.apiUrl[0] == '\\0' ||
+      config.instance == nullptr || config.instance[0] == '\\0' ||
+      config.apiKey == nullptr || config.apiKey[0] == '\\0') {
+    lastError_ = "Evolution API URL, instance, or API key is missing.";
+    draft.error = lastError_;
+    return false;
+  }
+  if (WiFi.status() != WL_CONNECTED) {
+    lastError_ = "Wi-Fi is not connected.";
+    draft.error = lastError_;
+    return false;
+  }
+
+  String baseUrl(config.apiUrl);
+  baseUrl.trim();
+  while (baseUrl.endsWith("/")) baseUrl.remove(baseUrl.length() - 1);
+  if (!baseUrl.startsWith("https://") && !baseUrl.startsWith("http://")) {
+    lastError_ = "Evolution API URL must start with https:// or http://.";
+    draft.error = lastError_;
+    return false;
+  }
+
+  String instance(config.instance);
+  instance.trim();
+  String encodedInstance;
+  for (size_t i = 0; i < instance.length(); ++i) {
+    const char ch = instance[i];
+    if (isalnum(static_cast<unsigned char>(ch)) || ch == '-' || ch == '_' || ch == '.') {
+      encodedInstance += ch;
+    } else {
+      char hex[4];
+      snprintf(hex, sizeof(hex), "%%%02X", static_cast<unsigned char>(ch));
+      encodedInstance += hex;
+    }
+  }
+
+  String number;
+  for (size_t i = 0; i < draft.number.length(); ++i) {
+    const char ch = draft.number[i];
+    if (isDigit(ch)) number += ch;
+  }
+  if (number.length() < 8 || number.length() > 15) {
+    lastError_ = "WhatsApp recipient number is invalid.";
+    draft.error = lastError_;
+    return false;
+  }
+
+  WiFiClientSecure tls;
+  tls.setInsecure();
+
+  HTTPClient http;
+  http.setConnectTimeout(CONNECT_TIMEOUT_MS);
+  http.setTimeout(REQUEST_TIMEOUT_MS);
+
+  const String endpoint =
+      baseUrl + "/message/sendText/" + encodedInstance;
+  if (!http.begin(tls, endpoint)) {
+    lastError_ = "Could not initialize Evolution API request.";
+    draft.error = lastError_;
+    return false;
+  }
+
+  http.addHeader("apikey", config.apiKey);
+  http.addHeader("Content-Type", "application/json");
+
+  DynamicJsonDocument requestDoc(1024 + draft.text.length() * 2);
+  requestDoc["number"] = number;
+  requestDoc["text"] = draft.text;
+  String requestBody;
+  serializeJson(requestDoc, requestBody);
+
+  lastHttpCode_ = http.POST(requestBody);
+  String responseBody = http.getString();
+  http.end();
+
+  if (lastHttpCode_ < 200 || lastHttpCode_ >= 300) {
+    lastError_ = lastHttpCode_ <= 0
+        ? String("Evolution API request failed: ") + HTTPClient::errorToString(lastHttpCode_)
+        : String("Evolution API returned HTTP ") + lastHttpCode_;
+    if (responseBody.length()) {
+      lastError_ += " ";
+      lastError_ += responseBody.substring(0, 400);
+    }
+    draft.error = lastError_;
+    return false;
+  }
+
+  draft.submitted = true;
+  draft.error = "";
+  return true;
+}
+
