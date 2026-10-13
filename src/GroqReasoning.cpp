@@ -5,6 +5,8 @@
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 #include <new>
+#include <Preferences.h>
+#include <time.h>
 
 namespace {
 constexpr char CHAT_ENDPOINT[] = "https://api.groq.com/openai/v1/chat/completions";
@@ -860,4 +862,358 @@ bool GroqReasoning::sendWhatsAppMessage(
     const char *apiKey) {
   const WhatsAppConfig config = {apiBaseUrl, instanceName, apiKey};
   return sendWhatsAppMessage(draft, config);
+}
+
+
+namespace {
+enum RuntimeScheduleState {
+  RUNTIME_NO_SCHEDULE,
+  RUNTIME_SCHEDULE_READY,
+  RUNTIME_SCHEDULE_CLARIFY,
+  RUNTIME_SCHEDULE_INVALID
+};
+
+bool runtimeClockReady() {
+  return time(nullptr) > 1700000000;
+}
+
+String runtimeTimeLabel(time_t value) {
+  struct tm tmValue;
+  if (localtime_r(&value, &tmValue) == nullptr) return "an unknown time";
+  char buffer[56];
+  strftime(buffer, sizeof(buffer), "%I:%M %p on %d %B", &tmValue);
+  return String(buffer) + " IST";
+}
+
+String runtimeDeliveryPrefix(String value) {
+  value.toLowerCase();
+  value.replace(".", "");
+  const char *markers[] = {
+    " saying ", " say ", " that says ", " that ", " message says ",
+    " with the message ", " with text ", " text saying "
+  };
+  int cut = -1;
+  for (size_t i = 0; i < sizeof(markers) / sizeof(markers[0]); ++i) {
+    int p = value.indexOf(markers[i]);
+    if (p >= 0 && (cut < 0 || p < cut)) cut = p;
+  }
+  if (cut >= 0) value.remove(cut);
+  value.trim();
+  return value;
+}
+
+bool runtimeFindClock(const String &value, int &timeStart) {
+  int best = -1;
+  int bestStart = -1;
+  const char *markers[] = {" at ", " for "};
+  for (size_t i = 0; i < 2; ++i) {
+    int from = 0;
+    while (true) {
+      int p = value.indexOf(markers[i], from);
+      if (p < 0) break;
+      int start = p + strlen(markers[i]);
+      while (start < value.length() && value[start] == ' ') ++start;
+      if (start < value.length() && isDigit(value[start])) {
+        if (best < 0 || p < best) { best = p; bestStart = start; }
+        break;
+      }
+      from = p + strlen(markers[i]);
+    }
+  }
+  if (bestStart < 0) return false;
+  timeStart = bestStart;
+  return true;
+}
+
+RuntimeScheduleState runtimeParseSchedule(
+    const String &transcript, time_t &target, String &response) {
+  const String prefix = runtimeDeliveryPrefix(transcript);
+  const bool tomorrow = prefix.indexOf("tomorrow") >= 0;
+  const bool today = prefix.indexOf("today") >= 0;
+  const bool later = prefix.indexOf("later") >= 0 ||
+                     prefix.indexOf("schedule") >= 0 ||
+                     prefix.indexOf("scheduled") >= 0;
+  int start = -1;
+  const bool hasClock = runtimeFindClock(prefix, start);
+  if (!hasClock && !tomorrow && !today && !later) return RUNTIME_NO_SCHEDULE;
+  if (!hasClock) {
+    response = "What time should I send it? Say, for example, tomorrow at 8 PM.";
+    return RUNTIME_SCHEDULE_CLARIFY;
+  }
+  if (!runtimeClockReady()) {
+    response = "I need an internet time sync before scheduling. Check Wi-Fi and try again.";
+    return RUNTIME_SCHEDULE_CLARIFY;
+  }
+
+  String clock = prefix.substring(start);
+  clock.trim();
+  if (clock.startsWith("about ")) clock = clock.substring(6);
+  else if (clock.startsWith("around ")) clock = clock.substring(7);
+
+  int i = 0;
+  while (i < clock.length() && isDigit(clock[i])) ++i;
+  if (i == 0) {
+    response = "Please repeat the time, for example 8:30 PM.";
+    return RUNTIME_SCHEDULE_INVALID;
+  }
+
+  String digits = clock.substring(0, i);
+  int hour = 0, minute = 0;
+  bool colon = false;
+  if (i < clock.length() && clock[i] == ':') {
+    colon = true;
+    hour = digits.toInt();
+    ++i;
+    int m = i;
+    while (i < clock.length() && isDigit(clock[i])) ++i;
+    if (m == i) {
+      response = "I couldn't read the minutes. Please repeat the time.";
+      return RUNTIME_SCHEDULE_INVALID;
+    }
+    minute = clock.substring(m, i).toInt();
+  } else if (digits.length() >= 3) {
+    colon = true;
+    hour = digits.substring(0, digits.length() - 2).toInt();
+    minute = digits.substring(digits.length() - 2).toInt();
+  } else {
+    hour = digits.toInt();
+  }
+
+  String suffix = clock.substring(i);
+  suffix.trim();
+  const bool am = suffix.startsWith("am") || suffix.startsWith("a m");
+  const bool pm = suffix.startsWith("pm") || suffix.startsWith("p m");
+  if (minute > 59 || hour > 23) {
+    response = "That time is invalid. Please say a valid time.";
+    return RUNTIME_SCHEDULE_INVALID;
+  }
+  if (am || pm) {
+    if (hour < 1 || hour > 12) {
+      response = "Please repeat the time using a valid AM or PM value.";
+      return RUNTIME_SCHEDULE_INVALID;
+    }
+    hour %= 12;
+    if (pm) hour += 12;
+  } else if (hour <= 12) {
+    response = "Should I use AM or PM? Please repeat the time with AM or PM.";
+    return RUNTIME_SCHEDULE_CLARIFY;
+  }
+
+  const time_t now = time(nullptr);
+  struct tm local;
+  if (localtime_r(&now, &local) == nullptr) {
+    response = "I couldn't read the Indian clock.";
+    return RUNTIME_SCHEDULE_INVALID;
+  }
+  local.tm_hour = hour;
+  local.tm_min = minute;
+  local.tm_sec = 0;
+  if (tomorrow) local.tm_mday += 1;
+  target = mktime(&local);
+  if (target <= now && !tomorrow) {
+    if (today) {
+      response = "That time has already passed today. Please give a future time or say tomorrow.";
+      return RUNTIME_SCHEDULE_CLARIFY;
+    }
+    local.tm_mday += 1;
+    target = mktime(&local);
+  }
+  response = "";
+  (void)colon;
+  return RUNTIME_SCHEDULE_READY;
+}
+} // namespace
+
+bool GroqReasoning::syncIndianClock(bool waitForSync) {
+  if (WiFi.status() != WL_CONNECTED) return false;
+  configTzTime("IST-5:30", "pool.ntp.org", "time.google.com", "time.cloudflare.com");
+  lastNtpAttemptMs_ = millis();
+  if (!waitForSync) return runtimeClockReady();
+  const unsigned long started = millis();
+  while (millis() - started < 10000) {
+    if (runtimeClockReady()) return true;
+    delay(200);
+  }
+  return runtimeClockReady();
+}
+
+String GroqReasoning::currentIndianTimeContext() const {
+  if (!runtimeClockReady()) return "";
+  const time_t now = time(nullptr);
+  struct tm local;
+  if (localtime_r(&now, &local) == nullptr) return "";
+  char buffer[80];
+  strftime(buffer, sizeof(buffer), "%A, %Y-%m-%d %H:%M:%S IST (UTC+05:30)", &local);
+  return String(buffer);
+}
+
+bool GroqReasoning::generateWhatsAppDraft(
+    const String &transcript,
+    const ContactMapping *contacts,
+    size_t contactCount,
+    WhatsAppDraft &draft,
+    const char *currentDateTime) {
+  if (!contacts || !contactCount) {
+    draft = WhatsAppDraft();
+    draft.error = "No WhatsApp contacts are configured.";
+    lastError_ = draft.error;
+    return false;
+  }
+  ContactNumberMapping *numbers =
+      new (std::nothrow) ContactNumberMapping[contactCount];
+  if (!numbers) {
+    draft = WhatsAppDraft();
+    draft.error = "Not enough memory for contact mappings.";
+    lastError_ = draft.error;
+    return false;
+  }
+  for (size_t i = 0; i < contactCount; ++i) {
+    numbers[i].name = contacts[i].name;
+    numbers[i].number = contacts[i].number;
+  }
+  const bool ok = generateWhatsAppDraft(
+      transcript, contacts, contactCount, numbers, contactCount, draft, currentDateTime);
+  delete[] numbers;
+  return ok;
+}
+
+GroqReasoning::Result GroqReasoning::processTranscript(
+    const String &transcript,
+    const DeviceMapping *devices,
+    size_t deviceCount,
+    const ContactMapping *contacts,
+    size_t contactCount,
+    const WhatsAppConfig &whatsappConfig) {
+  Result result;
+  result.response = "Sorry, I couldn't process that request right now.";
+  result.action = "none";
+  String clean = transcript;
+  clean.trim();
+  if (clean.isEmpty()) {
+    result.response = "Sorry, I couldn't understand that.";
+    return result;
+  }
+
+  serviceScheduledMessages(whatsappConfig);
+  const String now = currentIndianTimeContext();
+
+  if (!looksLikeWhatsAppRequest(clean, contacts, contactCount)) {
+    return ask(clean, devices, deviceCount, contacts, contactCount, now.c_str());
+  }
+
+  time_t deliveryEpoch = 0;
+  String scheduleResponse;
+  const RuntimeScheduleState schedule = runtimeParseSchedule(clean, deliveryEpoch, scheduleResponse);
+  if (schedule == RUNTIME_SCHEDULE_CLARIFY || schedule == RUNTIME_SCHEDULE_INVALID) {
+    result.response = scheduleResponse;
+    return result;
+  }
+  if (schedule == RUNTIME_SCHEDULE_READY && scheduledMessagePending_) {
+    result.response = "A WhatsApp message is already scheduled for " +
+                      runtimeTimeLabel(scheduledMessageEpoch_) +
+                      ". Send it or cancel it before scheduling another.";
+    return result;
+  }
+
+  WhatsAppDraft draft;
+  if (!generateWhatsAppDraft(clean, contacts, contactCount, draft, now.c_str())) {
+    result.response = "I couldn't prepare the WhatsApp message: " + draft.error;
+    return result;
+  }
+  if (!draft.send) {
+    result.response = "What would you like me to say in the message?";
+    return result;
+  }
+
+  if (schedule == RUNTIME_SCHEDULE_READY) {
+    Preferences prefs;
+    if (!prefs.begin("wa_sched", false)) {
+      result.response = "I couldn't save the scheduled message.";
+      return result;
+    }
+    prefs.putULong64("epoch", static_cast<uint64_t>(deliveryEpoch));
+    const bool stored =
+        prefs.putString("contact", draft.contact) > 0 &&
+        prefs.putString("number", draft.number) > 0 &&
+        prefs.putString("text", draft.text) > 0;
+    prefs.putBool("pending", stored);
+    prefs.end();
+    if (!stored) {
+      result.response = "I couldn't save the scheduled message.";
+      return result;
+    }
+    scheduledMessagePending_ = true;
+    scheduledMessageEpoch_ = deliveryEpoch;
+    scheduledMessageContact_ = draft.contact;
+    scheduledMessageNumber_ = draft.number;
+    scheduledMessageText_ = draft.text;
+    draft.scheduled = true;
+    draft.scheduledFor = runtimeTimeLabel(deliveryEpoch);
+    result.response = "Scheduled the WhatsApp message to " + draft.contact +
+                      " for " + draft.scheduledFor + ".";
+    return result;
+  }
+
+  if (sendWhatsAppMessage(draft, whatsappConfig)) {
+    result.response = "WhatsApp message submitted to Evolution API for " + draft.contact + ".";
+  } else {
+    result.response = "WhatsApp message could not be submitted: " + draft.error;
+  }
+  return result;
+}
+
+void GroqReasoning::serviceScheduledMessages(const WhatsAppConfig &whatsappConfig) {
+  if (!scheduleLoaded_) {
+    scheduleLoaded_ = true;
+    Preferences prefs;
+    if (prefs.begin("wa_sched", true)) {
+      scheduledMessagePending_ = prefs.getBool("pending", false);
+      if (scheduledMessagePending_) {
+        scheduledMessageEpoch_ = static_cast<time_t>(prefs.getULong64("epoch", 0));
+        scheduledMessageContact_ = prefs.getString("contact", "");
+        scheduledMessageNumber_ = prefs.getString("number", "");
+        scheduledMessageText_ = prefs.getString("text", "");
+        if (scheduledMessageEpoch_ <= 0 || scheduledMessageContact_.isEmpty() ||
+            scheduledMessageNumber_.isEmpty() || scheduledMessageText_.isEmpty()) {
+          scheduledMessagePending_ = false;
+        }
+      }
+      prefs.end();
+    }
+  }
+
+  if (!runtimeClockReady() && WiFi.status() == WL_CONNECTED &&
+      (lastNtpAttemptMs_ == 0 || millis() - lastNtpAttemptMs_ >= 60000)) {
+    syncIndianClock(false);
+  }
+  if (!scheduledMessagePending_ || !runtimeClockReady() ||
+      time(nullptr) < scheduledMessageEpoch_ ||
+      WiFi.status() != WL_CONNECTED || !initialized_) return;
+
+  const unsigned long nowMs = millis();
+  if (lastScheduledSendAttemptMs_ &&
+      nowMs - lastScheduledSendAttemptMs_ < 60000) return;
+  lastScheduledSendAttemptMs_ = nowMs;
+
+  WhatsAppDraft draft;
+  draft.send = true;
+  draft.contact = scheduledMessageContact_;
+  draft.number = scheduledMessageNumber_;
+  draft.text = scheduledMessageText_;
+  if (!sendWhatsAppMessage(draft, whatsappConfig)) return;
+
+  Preferences prefs;
+  if (prefs.begin("wa_sched", false)) {
+    prefs.putBool("pending", false);
+    prefs.remove("epoch");
+    prefs.remove("contact");
+    prefs.remove("number");
+    prefs.remove("text");
+    prefs.end();
+  }
+  scheduledMessagePending_ = false;
+  scheduledMessageEpoch_ = 0;
+  scheduledMessageContact_ = "";
+  scheduledMessageNumber_ = "";
+  scheduledMessageText_ = "";
 }
