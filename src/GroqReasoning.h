@@ -15,6 +15,20 @@ public:
     const char *aliases;  // Alternative names separated with |, e.g. "nurse|care nurse".
   };
 
+  struct ContactNumberMapping {
+    const char *name;    // Must match a canonical contact name.
+    const char *number;  // International format, e.g. +919876543210.
+  };
+
+  struct WhatsAppDraft {
+    bool send = false;
+    String contact;
+    String number;
+    String text;
+    String error;
+    String toJson() const;
+  };
+
   struct Result {
     String response;
     String action;
@@ -32,6 +46,17 @@ public:
              size_t deviceCount,
              const ContactMapping *contacts = nullptr,
              size_t contactCount = 0);
+
+  bool looksLikeWhatsAppRequest(const String &transcript) const;
+
+  // Creates a draft only; this method does not send a WhatsApp message.
+  // Phone numbers stay in firmware and are never sent to Groq.
+  bool generateWhatsAppDraft(const String &transcript,
+                             const ContactMapping *contacts,
+                             size_t contactCount,
+                             const ContactNumberMapping *phoneNumbers,
+                             size_t phoneNumberCount,
+                             WhatsAppDraft &draft);
 
   String lastError() const { return lastError_; }
   int lastHttpCode() const { return lastHttpCode_; }
