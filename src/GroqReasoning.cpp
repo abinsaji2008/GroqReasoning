@@ -349,15 +349,6 @@ GroqReasoning::Result GroqReasoning::ask(const String &transcript,
           lastError_ += details.substring(0, 300);
         }
       }
-      JsonVariant failedGeneration = errorDoc["error"]["failed_generation"];
-      if (!failedGeneration.isNull()) {
-        String details;
-        serializeJson(failedGeneration, details);
-        if (details.length() > 0) {
-          lastError_ += " | failed_generation: ";
-          lastError_ += details.substring(0, 300);
-        }
-      }
     }
   }
 
@@ -559,6 +550,15 @@ bool GroqReasoning::generateWhatsAppDraft(
       if (message[0] != '\0') {
         lastError_ += ": ";
         lastError_ += message;
+      }
+      JsonVariant failedGeneration = errorDoc["error"]["failed_generation"];
+      if (!failedGeneration.isNull()) {
+        String details;
+        serializeJson(failedGeneration, details);
+        if (details.length() > 0) {
+          lastError_ += " | failed_generation: ";
+          lastError_ += details.substring(0, 300);
+        }
       }
     }
     draft.error = lastError_;
