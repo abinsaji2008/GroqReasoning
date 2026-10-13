@@ -472,10 +472,22 @@ bool GroqReasoning::generateWhatsAppDraft(
       "Use only one of the listed canonical contacts, and return that canonical name, not an alias. "
       "Write a natural, concise message that preserves the user's intended meaning. Do not invent "
       "facts, times, promises, or events. Never generate, request, or return a phone number. "
-      "Do not claim a message has already been sent. If the user did not ask to send a message, "
-      "or the requested recipient is not in the contact list, return "
+      "Interpret the entire transcript, including earlier clauses. If the user says a sentence and then "
+      "asks to send 'it', use that sentence as the message body. If the user says 'send hi', the message body "
+      "is 'Hi'. Only ask for clarification when no message content is present anywhere in the transcript. "
+      "Do not claim a message has already been sent. If the user did not explicitly request sending, or the "
+      "recipient is not in the contact list, return "
       "{\"send\":false,\"contact\":\"\",\"text\":\"\"}. The text field must contain only "
-      "the message body. Allowed contacts:\n";
+      "the message body. Examples:\n"
+      "Transcript: 'send hi to my mother' -> "
+      "{\"send\":true,\"contact\":\"Mom\",\"text\":\"Hi\"}.\n"
+      "Transcript: 'can you send hi to mother' -> "
+      "{\"send\":true,\"contact\":\"Mom\",\"text\":\"Hi\"}.\n"
+      "Transcript: 'I am not feeling well. Send it to my mother through WhatsApp.' -> "
+      "{\"send\":true,\"contact\":\"Mom\",\"text\":\"I am not feeling well.\"}.\n"
+      "Transcript: 'send a message to my mother' -> "
+      "{\"send\":false,\"contact\":\"\",\"text\":\"\"}.\n"
+      "Allowed contacts:\n";
 
   for (size_t i = 0; i < contactCount; ++i) {
     if (contacts[i].name == nullptr || contacts[i].name[0] == '\0') continue;
