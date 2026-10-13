@@ -20,6 +20,11 @@ public:
     const char *number;
   };
 
+  struct ContactPhoneMapping {
+    const char *name;
+    const char *number;
+  };
+
   struct WhatsAppDraft {
     bool send = false;
     bool submitted = false;
@@ -27,6 +32,7 @@ public:
     String number;
     String text;
     String error;
+    String apiStatus;
     String toJson() const;
   };
 
@@ -43,7 +49,11 @@ public:
   };
 
   bool begin(const char *apiKey);
+  bool begin(const char *apiKey, const char *model);
   bool begin(const String &apiKey) { return begin(apiKey.c_str()); }
+  bool begin(const String &apiKey, const String &model) {
+    return begin(apiKey.c_str(), model.c_str());
+  }
 
   Result ask(const String &transcript,
              const DeviceMapping *devices,
@@ -51,9 +61,10 @@ public:
              const ContactMapping *contacts = nullptr,
              size_t contactCount = 0);
 
+  bool looksLikeWhatsAppRequest(const String &transcript) const;
   bool looksLikeWhatsAppRequest(const String &transcript,
-                                const ContactMapping *contacts = nullptr,
-                                size_t contactCount = 0) const;
+                                const ContactMapping *contacts,
+                                size_t contactCount) const;
 
   bool generateWhatsAppDraft(const String &transcript,
                              const ContactMapping *contacts,
@@ -62,8 +73,20 @@ public:
                              size_t phoneNumberCount,
                              WhatsAppDraft &draft);
 
+  bool generateWhatsAppDraft(const String &transcript,
+                             const ContactMapping *contacts,
+                             size_t contactCount,
+                             const ContactPhoneMapping *phoneNumbers,
+                             size_t phoneNumberCount,
+                             WhatsAppDraft &draft);
+
   bool sendWhatsAppMessage(WhatsAppDraft &draft,
                            const WhatsAppConfig &config);
+
+  bool sendWhatsAppMessage(WhatsAppDraft &draft,
+                           const char *apiBaseUrl,
+                           const char *instanceName,
+                           const char *apiKey);
 
   String lastError() const { return lastError_; }
   int lastHttpCode() const { return lastHttpCode_; }
@@ -78,6 +101,7 @@ private:
                        size_t deviceCount) const;
 
   String apiKey_;
+  String model_;
   String lastError_;
   int lastHttpCode_ = 0;
   bool initialized_ = false;
