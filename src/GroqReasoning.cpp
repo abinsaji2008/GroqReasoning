@@ -357,8 +357,9 @@ GroqReasoning::Result GroqReasoning::ask(const String &transcript,
 }
 
 String GroqReasoning::WhatsAppDraft::toJson() const {
-  DynamicJsonDocument doc(640 + contact.length() * 2 + number.length() * 2 +
-                          text.length() * 2 + error.length() * 2);
+  DynamicJsonDocument doc(768 + contact.length() * 2 + number.length() * 2 +
+                          text.length() * 2 + error.length() * 2 +
+                          scheduledFor.length() * 2);
   doc["send"] = send;
   doc["submitted"] = submitted;
   doc["contact"] = contact;
@@ -366,6 +367,8 @@ String GroqReasoning::WhatsAppDraft::toJson() const {
   doc["text"] = text;
   doc["error"] = error;
   doc["apiStatus"] = apiStatus;
+  doc["scheduled"] = scheduled;
+  doc["scheduledFor"] = scheduledFor;
   String json;
   serializeJson(doc, json);
   return json;
@@ -472,6 +475,8 @@ bool GroqReasoning::generateWhatsAppDraft(
       "Use only one of the listed canonical contacts, and return that canonical name, not an alias. "
       "Write a natural, concise message that preserves the user's intended meaning. Do not invent "
       "facts, times, promises, or events. Never generate, request, or return a phone number. "
+      "Treat delivery instructions such as 'at 8 PM' or 'tomorrow at 9 AM' as scheduling metadata, not "
+      "message text. Exclude those delivery instructions from the outgoing message body. "
       "Interpret the entire transcript, including earlier clauses. If the user says a sentence and then "
       "asks to send 'it', use that sentence as the message body. If the user says 'send hi', the message body "
       "is 'Hi'. Only ask for clarification when no message content is present anywhere in the transcript. "
