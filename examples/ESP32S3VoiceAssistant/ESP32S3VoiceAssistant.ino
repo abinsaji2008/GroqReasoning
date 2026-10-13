@@ -202,7 +202,7 @@ void handleWakeEvent() {
             }
         } else {
             if (!finalResponse.isEmpty()) finalResponse += " ";
-            finalResponse += "No WhatsApp message was prepared.";
+            finalResponse += "What would you like me to say in the message?";
         }
     }
 
