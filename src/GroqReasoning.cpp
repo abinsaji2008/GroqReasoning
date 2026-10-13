@@ -249,7 +249,19 @@ GroqReasoning::Result GroqReasoning::ask(const String &transcript,
   requestDoc["reasoning_effort"] = "low";
   requestDoc["include_reasoning"] = false;
   JsonObject responseFormat = requestDoc.createNestedObject("response_format");
-  responseFormat["type"] = "json_object";
+  responseFormat["type"] = "json_schema";
+  JsonObject jsonSchema = responseFormat.createNestedObject("json_schema");
+  jsonSchema["name"] = "assistant_intent";
+  jsonSchema["strict"] = true;
+  JsonObject schema = jsonSchema.createNestedObject("schema");
+  schema["type"] = "object";
+  JsonObject properties = schema.createNestedObject("properties");
+  properties.createNestedObject("response")["type"] = "string";
+  properties.createNestedObject("action")["type"] = "string";
+  JsonArray required = schema.createNestedArray("required");
+  required.add("response");
+  required.add("action");
+  schema["additionalProperties"] = false;
 
   JsonArray messages = requestDoc.createNestedArray("messages");
   JsonObject systemMessage = messages.createNestedObject();
@@ -327,6 +339,24 @@ GroqReasoning::Result GroqReasoning::ask(const String &transcript,
       if (message[0] != '\0') {
         lastError_ += ": ";
         lastError_ += message;
+      }
+      JsonVariant failedGeneration = errorDoc["error"]["failed_generation"];
+      if (!failedGeneration.isNull()) {
+        String details;
+        serializeJson(failedGeneration, details);
+        if (details.length() > 0) {
+          lastError_ += " | failed_generation: ";
+          lastError_ += details.substring(0, 300);
+        }
+      }
+      JsonVariant failedGeneration = errorDoc["error"]["failed_generation"];
+      if (!failedGeneration.isNull()) {
+        String details;
+        serializeJson(failedGeneration, details);
+        if (details.length() > 0) {
+          lastError_ += " | failed_generation: ";
+          lastError_ += details.substring(0, 300);
+        }
       }
     }
   }
@@ -485,8 +515,24 @@ bool GroqReasoning::generateWhatsAppDraft(
       3072 + systemPrompt.length() * 2 + cleanTranscript.length() * 2);
   requestDoc["model"] = model_;
   requestDoc["max_completion_tokens"] = 300;
+  requestDoc["reasoning_effort"] = "low";
+  requestDoc["include_reasoning"] = false;
   JsonObject responseFormat = requestDoc.createNestedObject("response_format");
-  responseFormat["type"] = "json_object";
+  responseFormat["type"] = "json_schema";
+  JsonObject jsonSchema = responseFormat.createNestedObject("json_schema");
+  jsonSchema["name"] = "whatsapp_draft";
+  jsonSchema["strict"] = true;
+  JsonObject schema = jsonSchema.createNestedObject("schema");
+  schema["type"] = "object";
+  JsonObject properties = schema.createNestedObject("properties");
+  properties.createNestedObject("send")["type"] = "boolean";
+  properties.createNestedObject("contact")["type"] = "string";
+  properties.createNestedObject("text")["type"] = "string";
+  JsonArray required = schema.createNestedArray("required");
+  required.add("send");
+  required.add("contact");
+  required.add("text");
+  schema["additionalProperties"] = false;
 
   JsonArray messages = requestDoc.createNestedArray("messages");
   JsonObject systemMessage = messages.createNestedObject();
