@@ -330,6 +330,7 @@ String GroqReasoning::WhatsAppDraft::toJson() const {
   DynamicJsonDocument doc(512 + contact.length() * 2 + number.length() * 2 +
                           text.length() * 2 + error.length() * 2);
   doc["send"] = send;
+  doc["submitted"] = submitted;
   doc["contact"] = contact;
   doc["number"] = number;
   doc["text"] = text;
