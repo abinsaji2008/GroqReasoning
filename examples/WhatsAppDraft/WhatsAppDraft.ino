@@ -71,10 +71,29 @@ void loop() {
         draft
     );
 
-    Serial.println(draft.toJson());
-    if (!generated) {
-      Serial.print("Draft error: ");
-      Serial.println(reasoning.lastError());
+    if (generated && draft.send) {
+      GroqReasoning::WhatsAppConfig waConfig = {
+        SEED_EVOLUTION_API_URL,
+        SEED_EVOLUTION_INSTANCE,
+        SEED_EVOLUTION_API_KEY
+      };
+
+      const bool sentRequest =
+          reasoning.sendWhatsAppMessage(draft, waConfig);
+
+      Serial.println(draft.toJson());
+      if (!sentRequest) {
+        Serial.print("WhatsApp send failed: ");
+        Serial.println(reasoning.lastError());
+      } else {
+        Serial.println("Evolution API accepted the message request.");
+      }
+    } else {
+      Serial.println(draft.toJson());
+      if (!generated) {
+        Serial.print("Draft error: ");
+        Serial.println(reasoning.lastError());
+      }
     }
     return;
   }
