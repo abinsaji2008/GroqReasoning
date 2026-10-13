@@ -247,7 +247,7 @@ GroqReasoning::Result GroqReasoning::ask(const String &transcript,
   requestDoc["model"] = model_;
   requestDoc["max_completion_tokens"] = MAX_COMPLETION_TOKENS;
   requestDoc["reasoning_effort"] = "low";
-  requestDoc["reasoning_format"] = "hidden";
+  requestDoc["include_reasoning"] = false;
   JsonObject responseFormat = requestDoc.createNestedObject("response_format");
   responseFormat["type"] = "json_object";
 
