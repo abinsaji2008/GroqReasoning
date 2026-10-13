@@ -61,7 +61,8 @@ public:
              const DeviceMapping *devices,
              size_t deviceCount,
              const ContactMapping *contacts = nullptr,
-             size_t contactCount = 0);
+             size_t contactCount = 0,
+             const char *currentDateTime = nullptr);
 
   bool looksLikeWhatsAppRequest(const String &transcript) const;
   bool looksLikeWhatsAppRequest(const String &transcript,
@@ -73,14 +74,16 @@ public:
                              size_t contactCount,
                              const ContactNumberMapping *phoneNumbers,
                              size_t phoneNumberCount,
-                             WhatsAppDraft &draft);
+                             WhatsAppDraft &draft,
+                             const char *currentDateTime = nullptr);
 
   bool generateWhatsAppDraft(const String &transcript,
                              const ContactMapping *contacts,
                              size_t contactCount,
                              const ContactPhoneMapping *phoneNumbers,
                              size_t phoneNumberCount,
-                             WhatsAppDraft &draft);
+                             WhatsAppDraft &draft,
+                             const char *currentDateTime = nullptr);
 
   bool sendWhatsAppMessage(WhatsAppDraft &draft,
                            const WhatsAppConfig &config);
