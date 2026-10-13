@@ -2,6 +2,7 @@
 #define GROQ_REASONING_H
 
 #include <Arduino.h>
+#include <time.h>
 
 class GroqReasoning {
 public:
@@ -13,6 +14,10 @@ public:
   struct ContactMapping {
     const char *name;
     const char *aliases;
+    const char *number;
+    ContactMapping(const char *n = nullptr, const char *a = nullptr,
+                   const char *p = nullptr)
+        : name(n), aliases(a), number(p) {}
   };
 
   struct ContactNumberMapping {
@@ -85,6 +90,26 @@ public:
                              WhatsAppDraft &draft,
                              const char *currentDateTime = nullptr);
 
+  // Convenience overload: phone number is stored alongside each contact.
+  bool generateWhatsAppDraft(const String &transcript,
+                             const ContactMapping *contacts,
+                             size_t contactCount,
+                             WhatsAppDraft &draft,
+                             const char *currentDateTime = nullptr);
+
+  // End-to-end voice request routing: WhatsApp, scheduling, or normal Groq reasoning.
+  Result processTranscript(const String &transcript,
+                           const DeviceMapping *devices,
+                           size_t deviceCount,
+                           const ContactMapping *contacts,
+                           size_t contactCount,
+                           const WhatsAppConfig &whatsappConfig);
+
+  // NTP time helpers (India Standard Time).
+  bool syncIndianClock(bool waitForSync = true);
+  String currentIndianTimeContext() const;
+  void serviceScheduledMessages(const WhatsAppConfig &whatsappConfig);
+
   bool sendWhatsAppMessage(WhatsAppDraft &draft,
                            const WhatsAppConfig &config);
 
@@ -110,6 +135,15 @@ private:
   String lastError_;
   int lastHttpCode_ = 0;
   bool initialized_ = false;
+
+  bool scheduleLoaded_ = false;
+  bool scheduledMessagePending_ = false;
+  time_t scheduledMessageEpoch_ = 0;
+  String scheduledMessageContact_;
+  String scheduledMessageNumber_;
+  String scheduledMessageText_;
+  unsigned long lastScheduledSendAttemptMs_ = 0;
+  unsigned long lastNtpAttemptMs_ = 0;
 };
 
 #endif
