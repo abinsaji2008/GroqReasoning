@@ -1,0 +1,52 @@
+name: Arduino Library Check and Release Tag
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "library.properties"
+      - "README.md"
+      - "src/**"
+      - "examples/**"
+      - ".github/workflows/arduino-library.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  validate-and-tag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check Arduino library compliance
+        uses: arduino/arduino-lint-action@v3
+        with:
+          project-type: library
+          recursive: false
+          library-manager: false
+          compliance: permissive
+
+      - name: Create version tag if missing
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(sed -n 's/^version=//p' library.properties | head -n 1)"
+          if [[ -z "$VERSION" ]]; then
+            echo "::error::No version found in library.properties"
+            exit 1
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/$VERSION" >/dev/null 2>&1; then
+            echo "Tag $VERSION already exists; leaving it unchanged."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag -a "$VERSION" -m "GroqReasoning $VERSION"
+            git push origin "refs/tags/$VERSION"
+            echo "Created and pushed tag $VERSION."
+          fi
