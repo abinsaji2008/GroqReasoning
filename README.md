@@ -1,4 +1,4 @@
-# GroqReasoning v1.4.0
+# GroqReasoning v1.4.1
 
 An ESP32 Arduino library that sends a transcript to Groq and returns a JSON object with exactly two string fields:
 
@@ -161,3 +161,7 @@ Required additional libraries for this example: `WakeNet9Arduino` and `GroqAudio
 Evolution API submission uses `POST {base URL}/message/sendText/{instance}` with the `apikey` header and JSON fields `number` and `text`. The number is sent as digits including its country code, without a leading plus. A successful 2xx response means the API accepted the request; final WhatsApp delivery should be checked using your server's status/webhook flow.
 
 The prototype uses `WiFiClientSecure::setInsecure()`; configure TLS certificate verification before production use.
+
+### Compatibility with older sketches
+
+Version 1.4.1 keeps compatibility overloads for sketches using `ContactPhoneMapping`, `begin(apiKey, model)`, `looksLikeWhatsAppRequest(transcript)`, and the four-argument `sendWhatsAppMessage(draft, apiBaseUrl, instanceName, apiKey)` form. Replace both `src/GroqReasoning.h` and `src/GroqReasoning.cpp` together when updating the library; mixing files from different versions can cause linker errors.
