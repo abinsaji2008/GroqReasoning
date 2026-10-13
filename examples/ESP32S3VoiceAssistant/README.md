@@ -26,3 +26,7 @@ The library currently uses `WiFiClientSecure::setInsecure()` for development. Ad
 ## Indian time and scheduled WhatsApp
 
 The sketch synchronizes online time with NTP using IST (UTC+05:30). Ask “What time is it?” to hear the current Indian time. Use commands like “Send hi to Mom at 8:30 PM” or “Send I will be home soon to Mom tomorrow at 9 AM” to schedule a message. One pending scheduled message is saved in ESP32 NVS. It is submitted after the target time when Wi-Fi and Evolution API are available; delivery may be late if either is unavailable. Avoid mentioning a time inside the body after “saying” unless you intend that time to be part of the message.
+
+## NTP timestamp passed to Groq
+
+The sketch syncs the ESP32 system clock from NTP in IST (UTC+05:30). For every reasoning and WhatsApp draft-generation request, it reads the current clock value and passes a formatted timestamp into the Groq system prompt. Ask “What time is it?” and the request goes to Groq with the timestamp, so the AI answers from it rather than using a hard-coded local response. The ESP32 clock advances between synchronizations and is periodically corrected by NTP while internet-connected.
