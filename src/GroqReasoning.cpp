@@ -4,6 +4,7 @@
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
+#include <new>
 
 namespace {
 constexpr char CHAT_ENDPOINT[] = "https://api.groq.com/openai/v1/chat/completions";
@@ -123,6 +124,10 @@ String GroqReasoning::Result::toJson() const {
 }
 
 bool GroqReasoning::begin(const char *apiKey) {
+  return begin(apiKey, DEFAULT_MODEL);
+}
+
+bool GroqReasoning::begin(const char *apiKey, const char *model) {
   lastError_ = "";
   lastHttpCode_ = 0;
   initialized_ = false;
@@ -138,6 +143,10 @@ bool GroqReasoning::begin(const char *apiKey) {
     lastError_ = "Groq API key is missing.";
     return false;
   }
+
+  model_ = (model != nullptr && model[0] != '\0') ? model : DEFAULT_MODEL;
+  model_.trim();
+  if (model_.isEmpty()) model_ = DEFAULT_MODEL;
 
   initialized_ = true;
   return true;
@@ -235,7 +244,7 @@ GroqReasoning::Result GroqReasoning::ask(const String &transcript,
 
   const String systemPrompt = makeSystemPrompt(devices, deviceCount, contacts, contactCount);
   DynamicJsonDocument requestDoc(2048 + systemPrompt.length() * 2 + cleanTranscript.length() * 2);
-  requestDoc["model"] = DEFAULT_MODEL;
+  requestDoc["model"] = model_;
   requestDoc["max_completion_tokens"] = MAX_COMPLETION_TOKENS;
   requestDoc["reasoning_effort"] = "low";
   requestDoc["reasoning_format"] = "hidden";
@@ -335,9 +344,15 @@ String GroqReasoning::WhatsAppDraft::toJson() const {
   doc["number"] = number;
   doc["text"] = text;
   doc["error"] = error;
+  doc["apiStatus"] = apiStatus;
   String json;
   serializeJson(doc, json);
   return json;
+}
+
+bool GroqReasoning::looksLikeWhatsAppRequest(
+    const String &transcript) const {
+  return looksLikeWhatsAppRequest(transcript, nullptr, 0);
 }
 
 bool GroqReasoning::looksLikeWhatsAppRequest(
@@ -468,7 +483,7 @@ bool GroqReasoning::generateWhatsAppDraft(
 
   DynamicJsonDocument requestDoc(
       3072 + systemPrompt.length() * 2 + cleanTranscript.length() * 2);
-  requestDoc["model"] = DEFAULT_MODEL;
+  requestDoc["model"] = model_;
   requestDoc["max_completion_tokens"] = 300;
   JsonObject responseFormat = requestDoc.createNestedObject("response_format");
   responseFormat["type"] = "json_object";
@@ -602,10 +617,50 @@ bool GroqReasoning::generateWhatsAppDraft(
   return true;
 }
 
+bool GroqReasoning::generateWhatsAppDraft(
+    const String &transcript,
+    const ContactMapping *contacts,
+    size_t contactCount,
+    const ContactPhoneMapping *phoneNumbers,
+    size_t phoneNumberCount,
+    WhatsAppDraft &draft) {
+  if (phoneNumberCount == 0) {
+    return generateWhatsAppDraft(
+        transcript, contacts, contactCount,
+        static_cast<const ContactNumberMapping *>(nullptr), 0, draft);
+  }
+  if (phoneNumbers == nullptr) {
+    draft = WhatsAppDraft();
+    draft.error = "Phone-number mapping is missing.";
+    lastError_ = draft.error;
+    return false;
+  }
+
+  ContactNumberMapping *converted =
+      new (std::nothrow) ContactNumberMapping[phoneNumberCount];
+  if (converted == nullptr) {
+    draft = WhatsAppDraft();
+    draft.error = "Not enough memory to prepare WhatsApp contact mappings.";
+    lastError_ = draft.error;
+    return false;
+  }
+
+  for (size_t i = 0; i < phoneNumberCount; ++i) {
+    converted[i].name = phoneNumbers[i].name;
+    converted[i].number = phoneNumbers[i].number;
+  }
+
+  const bool ok = generateWhatsAppDraft(
+      transcript, contacts, contactCount, converted, phoneNumberCount, draft);
+  delete[] converted;
+  return ok;
+}
+
 bool GroqReasoning::sendWhatsAppMessage(
     WhatsAppDraft &draft,
     const WhatsAppConfig &config) {
   draft.submitted = false;
+  draft.apiStatus = "";
   lastError_ = "";
   lastHttpCode_ = 0;
 
@@ -697,12 +752,22 @@ bool GroqReasoning::sendWhatsAppMessage(
       lastError_ += " ";
       lastError_ += responseBody.substring(0, 400);
     }
+    draft.apiStatus = String(lastHttpCode_);
     draft.error = lastError_;
     return false;
   }
 
+  draft.apiStatus = String(lastHttpCode_);
   draft.submitted = true;
   draft.error = "";
   return true;
 }
 
+bool GroqReasoning::sendWhatsAppMessage(
+    WhatsAppDraft &draft,
+    const char *apiBaseUrl,
+    const char *instanceName,
+    const char *apiKey) {
+  const WhatsAppConfig config = {apiBaseUrl, instanceName, apiKey};
+  return sendWhatsAppMessage(draft, config);
+}
