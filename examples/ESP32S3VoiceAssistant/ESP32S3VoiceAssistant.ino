@@ -160,6 +160,13 @@ void handleWakeEvent() {
         CONTACT_COUNT
     );
 
+    if (!reasoning.lastError().isEmpty()) {
+        Serial.print("[REASONING] HTTP status: ");
+        Serial.println(reasoning.lastHttpCode());
+        Serial.print("[REASONING] Error: ");
+        Serial.println(reasoning.lastError());
+    }
+
     String finalResponse = result.response;
     String finalAction = result.action;
 
