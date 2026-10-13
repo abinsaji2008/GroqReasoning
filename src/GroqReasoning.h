@@ -47,7 +47,9 @@ public:
              const ContactMapping *contacts = nullptr,
              size_t contactCount = 0);
 
-  bool looksLikeWhatsAppRequest(const String &transcript,\n                                 const ContactMapping *contacts = nullptr,\n                                 size_t contactCount = 0) const;
+  bool looksLikeWhatsAppRequest(const String &transcript,
+                                 const ContactMapping *contacts = nullptr,
+                                 size_t contactCount = 0) const;
 
   // Creates a draft only; this method does not send a WhatsApp message.
   // Phone numbers stay in firmware and are never sent to Groq.
