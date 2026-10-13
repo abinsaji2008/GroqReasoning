@@ -1,4 +1,4 @@
-# GroqReasoning v1.4.6
+# GroqReasoning v1.4.7
 
 An ESP32 Arduino library that sends a transcript to Groq and returns a JSON object with exactly two string fields:
 
@@ -182,3 +182,7 @@ The ESP32-S3 example checks for a WhatsApp request before normal intent routing,
 ### Indian online clock and scheduled WhatsApp messages
 
 The ESP32-S3 voice-assistant example synchronizes the local clock from NTP servers in Indian Standard Time (UTC+05:30). Time questions are answered from the synchronized clock. WhatsApp commands such as “send hi to Mom at 8:30 PM” or “send this to Mom tomorrow at 9 AM” can be scheduled; one pending message is saved in ESP32 NVS and retried after its due time until Evolution API accepts it. Exact delivery time depends on Wi-Fi and Evolution API availability. The example also supports “incomplete timing” clarification by asking for a specific Indian time when the user says “later” or “tomorrow” without giving a time.
+
+### NTP time context for Groq reasoning
+
+The ESP32-S3 example synchronizes the ESP32 system clock through NTP using India Standard Time (UTC+05:30). Every Groq reasoning request and WhatsApp draft-generation request receives the current local timestamp as prompt context. Current-time/date questions are sent to Groq, which answers using that timestamp; the sketch does not answer those questions locally. The ESP32 clock continues to advance between NTP synchronizations, and the network time service corrects it periodically.
