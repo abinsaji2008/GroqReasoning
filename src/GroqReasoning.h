@@ -14,7 +14,10 @@ public:
   struct ContactMapping {
     const char *name;
     const char *aliases;
-    const char *number = nullptr; // Optional WhatsApp number; one mapping per contact.
+    const char *number;
+    ContactMapping(const char *n = nullptr, const char *a = nullptr,
+                   const char *p = nullptr)
+        : name(n), aliases(a), number(p) {}
   };
 
   struct ContactNumberMapping {
