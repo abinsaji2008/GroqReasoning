@@ -76,6 +76,34 @@ Serial.println(result.toJson());
 - `ArduinoJson` library.
 - Wi-Fi connected by the main sketch.
 
+
+## WhatsApp message drafts
+
+The library can prepare WhatsApp drafts through `generateWhatsAppDraft()`. It returns the selected canonical contact, validated phone number, and message text. It **does not send** the WhatsApp message; your firmware or backend must handle sending after applying your own confirmation and safety checks.
+
+Phone numbers are passed separately in firmware and are not sent to Groq.
+
+```cpp
+const GroqReasoning::ContactNumberMapping PHONE_MAP[] = {
+  {"Mom", "+919876543210"},
+  {"Nurse", "+919876543211"}
+};
+
+GroqReasoning::WhatsAppDraft draft;
+bool ok = reasoning.generateWhatsAppDraft(
+    transcript,
+    CONTACT_MAP,
+    sizeof(CONTACT_MAP) / sizeof(CONTACT_MAP[0]),
+    PHONE_MAP,
+    sizeof(PHONE_MAP) / sizeof(PHONE_MAP[0]),
+    draft
+);
+
+Serial.println(draft.toJson());
+```
+
+Replace the example phone numbers with the intended recipients' numbers. The included example is `examples/WhatsAppDraft/WhatsAppDraft.ino`.
+
 ## Security
 
 This development build uses `WiFiClientSecure::setInsecure()`, which disables TLS certificate verification. Configure CA verification before production use. Do not execute model output directly: continue validating actions in firmware.
