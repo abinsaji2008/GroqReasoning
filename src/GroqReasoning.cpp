@@ -44,7 +44,8 @@ bool isCallAction(const String &action) {
 String makeSystemPrompt(const GroqReasoning::DeviceMapping *devices,
                         size_t deviceCount,
                         const GroqReasoning::ContactMapping *contacts,
-                        size_t contactCount) {
+                        size_t contactCount,
+                        const char *currentDateTime) {
   String prompt;
   prompt.reserve(1200 + deviceCount * 140 + contactCount * 100);
   prompt =
@@ -103,6 +104,18 @@ String makeSystemPrompt(const GroqReasoning::DeviceMapping *devices,
       "{\"response\":\"Turning on the primary light.\",\"action\":\"l1on\"}. "
       "If the user asks to call a person, make the action call:<person> and let firmware validate it. "
       "If the user asks for water, use refill_water. Always return both JSON fields.";
+
+  if (currentDateTime != nullptr && currentDateTime[0] != '\0') {
+    prompt += "\n\nCurrent system date and time: ";
+    prompt += currentDateTime;
+    prompt += ". This timestamp is authoritative and represents the current time in India Standard Time (IST, UTC+05:30). ";
+    prompt += "For questions about the current time, date, day, or relative time such as today or tomorrow, answer using this timestamp. ";
+    prompt += "Do not claim you do not know the current time when a timestamp is present. ";
+    prompt += "For unrelated device commands, use this timestamp only if relevant and do not change the requested action. ";
+  } else {
+    prompt += "\n\nCurrent system date and time is unavailable. Do not guess the current time or date.";
+  }
+
   return prompt;
 }
 
@@ -199,7 +212,8 @@ GroqReasoning::Result GroqReasoning::ask(const String &transcript,
                                          const DeviceMapping *devices,
                                          size_t deviceCount,
                                          const ContactMapping *contacts,
-                                         size_t contactCount) {
+                                         size_t contactCount,
+                                         const char *currentDateTime) {
   Result result;
   result.response = "Sorry, I couldn't process that request right now.";
   result.action = "none";
@@ -242,7 +256,8 @@ GroqReasoning::Result GroqReasoning::ask(const String &transcript,
   http.addHeader("Authorization", String("Bearer ") + apiKey_);
   http.addHeader("Content-Type", "application/json");
 
-  const String systemPrompt = makeSystemPrompt(devices, deviceCount, contacts, contactCount);
+  const String systemPrompt = makeSystemPrompt(
+      devices, deviceCount, contacts, contactCount, currentDateTime);
   DynamicJsonDocument requestDoc(2048 + systemPrompt.length() * 2 + cleanTranscript.length() * 2);
   requestDoc["model"] = model_;
   requestDoc["max_completion_tokens"] = MAX_COMPLETION_TOKENS;
@@ -434,7 +449,8 @@ bool GroqReasoning::generateWhatsAppDraft(
     size_t contactCount,
     const ContactNumberMapping *phoneNumbers,
     size_t phoneNumberCount,
-    WhatsAppDraft &draft) {
+    WhatsAppDraft &draft,
+    const char *currentDateTime) {
   draft = WhatsAppDraft();
   lastError_ = "";
   lastHttpCode_ = 0;
@@ -493,6 +509,13 @@ bool GroqReasoning::generateWhatsAppDraft(
       "Transcript: 'send a message to my mother' -> "
       "{\"send\":false,\"contact\":\"\",\"text\":\"\"}.\n"
       "Allowed contacts:\n";
+
+  if (currentDateTime != nullptr && currentDateTime[0] != '\0') {
+    systemPrompt += "\nCurrent system date and time: ";
+    systemPrompt += currentDateTime;
+    systemPrompt += ". This is the current time in India Standard Time (IST, UTC+05:30). ";
+    systemPrompt += "Use it only for relative delivery timing and never copy the timestamp into message text unless requested by the user.";
+  }
 
   for (size_t i = 0; i < contactCount; ++i) {
     if (contacts[i].name == nullptr || contacts[i].name[0] == '\0') continue;
@@ -689,7 +712,8 @@ bool GroqReasoning::generateWhatsAppDraft(
     size_t contactCount,
     const ContactPhoneMapping *phoneNumbers,
     size_t phoneNumberCount,
-    WhatsAppDraft &draft) {
+    WhatsAppDraft &draft,
+    const char *currentDateTime) {
   if (phoneNumberCount == 0) {
     return generateWhatsAppDraft(
         transcript, contacts, contactCount,
@@ -717,7 +741,7 @@ bool GroqReasoning::generateWhatsAppDraft(
   }
 
   const bool ok = generateWhatsAppDraft(
-      transcript, contacts, contactCount, converted, phoneNumberCount, draft);
+      transcript, contacts, contactCount, converted, phoneNumberCount, draft, currentDateTime);
   delete[] converted;
   return ok;
 }
