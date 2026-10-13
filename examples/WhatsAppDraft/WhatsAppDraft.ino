@@ -59,7 +59,7 @@ void loop() {
   transcript.trim();
   if (transcript.isEmpty()) return;
 
-  if (reasoning.looksLikeWhatsAppRequest(transcript)) {
+  if (reasoning.looksLikeWhatsAppRequest(transcript, CONTACT_MAP, CONTACT_COUNT)) {
     GroqReasoning::WhatsAppDraft draft;
 
     const bool generated = reasoning.generateWhatsAppDraft(
