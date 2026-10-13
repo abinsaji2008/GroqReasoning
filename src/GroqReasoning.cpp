@@ -7,6 +7,8 @@
 #include <new>
 #include <Preferences.h>
 #include <time.h>
+#include <stdint.h>
+#include <string.h>
 
 namespace {
 constexpr char CHAT_ENDPOINT[] = "https://api.groq.com/openai/v1/chat/completions";
