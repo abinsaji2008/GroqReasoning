@@ -1,4 +1,4 @@
-# GroqReasoning v1.4.5
+# GroqReasoning v1.4.6
 
 An ESP32 Arduino library that sends a transcript to Groq and returns a JSON object with exactly two string fields:
 
@@ -178,3 +178,7 @@ When the user requests a message without clearly dictating what it should say, t
 ### WhatsApp intent handling
 
 The ESP32-S3 example checks for a WhatsApp request before normal intent routing, preventing phrases such as “send it to my mother” from being classified as phone-call actions. The draft prompt includes examples for “send hi to my mother” and for sending a preceding sentence when the user says “send it”. If no message text was spoken, the example asks for the message instead of sending an invented greeting.
+
+### Indian online clock and scheduled WhatsApp messages
+
+The ESP32-S3 voice-assistant example synchronizes the local clock from NTP servers in Indian Standard Time (UTC+05:30). Time questions are answered from the synchronized clock. WhatsApp commands such as “send hi to Mom at 8:30 PM” or “send this to Mom tomorrow at 9 AM” can be scheduled; one pending message is saved in ESP32 NVS and retried after its due time until Evolution API accepts it. Exact delivery time depends on Wi-Fi and Evolution API availability. The example also supports “incomplete timing” clarification by asking for a specific Indian time when the user says “later” or “tomorrow” without giving a time.
