@@ -465,7 +465,10 @@ bool GroqReasoning::generateWhatsAppDraft(
   String systemPrompt =
       "Prepare WhatsApp message drafts from voice commands. Return ONLY a valid JSON object "
       "with exactly three fields: send (boolean), contact (string), and text (string). "
-      "Set send=true only when the user explicitly requests an outbound WhatsApp message. "
+      "Set send=true only when the user explicitly requests an outbound WhatsApp message AND "
+      "clearly provides the message content. If a recipient is specified but no message content is "
+      "provided, set send=false and return empty contact and text strings; never invent a generic greeting "
+      "or infer what the user wants to say. "
       "Use only one of the listed canonical contacts, and return that canonical name, not an alias. "
       "Write a natural, concise message that preserves the user's intended meaning. Do not invent "
       "facts, times, promises, or events. Never generate, request, or return a phone number. "
