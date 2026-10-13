@@ -165,24 +165,17 @@ bool syncIndianClock(bool waitForSync) {
     return indianClockReady();
 }
 
-String currentIndianTimeResponse() {
-    if (!indianClockReady()) {
-        return "I can't access the current Indian time yet because internet time has not synchronized.";
-    }
 
-    time_t now = time(nullptr);
+String currentIndianTimeContext() {
+    if (!indianClockReady()) return "";
+
+    const time_t now = time(nullptr);
     struct tm localTime;
-    if (localtime_r(&now, &localTime) == nullptr) {
-        return "I couldn't read the current Indian time.";
-    }
+    if (localtime_r(&now, &localTime) == nullptr) return "";
 
-    char timeBuffer[24];
-    char dateBuffer[48];
-    strftime(timeBuffer, sizeof(timeBuffer), "%I:%M %p", &localTime);
-    strftime(dateBuffer, sizeof(dateBuffer), "%A, %d %B %Y", &localTime);
-
-    return String("The current time in India is ") + timeBuffer +
-           " IST on " + dateBuffer + ".";
+    char buffer[80];
+    strftime(buffer, sizeof(buffer), "%A, %Y-%m-%d %H:%M:%S IST (UTC+05:30)", &localTime);
+    return String(buffer);
 }
 
 String scheduleDisplayTime(time_t target) {
@@ -202,29 +195,6 @@ String lowerWithoutDots(String text) {
     return text;
 }
 
-bool isCurrentTimeQuestion(const String &transcript) {
-    String text = lowerWithoutDots(transcript);
-
-    // Do not intercept a message-delivery request that happens to mention a time.
-    if (text.indexOf("send ") >= 0 ||
-        text.indexOf("message") >= 0 ||
-        text.indexOf("whatsapp") >= 0 ||
-        text.indexOf("text ") >= 0) {
-        return false;
-    }
-
-    return text.indexOf("what time") >= 0 ||
-           text.indexOf("time is it") >= 0 ||
-           text.indexOf("current time") >= 0 ||
-           text.indexOf("time now") >= 0 ||
-           text.indexOf("tell me the time") >= 0 ||
-           text.indexOf("tell me time") >= 0 ||
-           text.indexOf("what is the time") >= 0 ||
-           text.indexOf("what's the time") >= 0 ||
-           text.indexOf("what date") >= 0 ||
-           text.indexOf("date today") >= 0 ||
-           text.indexOf("today's date") >= 0;
-}
 
 String deliveryInstructionPrefix(String transcript) {
     String text = lowerWithoutDots(transcript);
@@ -551,12 +521,6 @@ void handleWakeEvent() {
         return;
     }
 
-    if (isCurrentTimeQuestion(transcript)) {
-        printResult(currentIndianTimeResponse());
-        startWakeNet();
-        return;
-    }
-
     GroqReasoning::WhatsAppDraft wa;
     String finalResponse;
     String finalAction = "none";
@@ -585,13 +549,15 @@ void handleWakeEvent() {
             Serial.println("[WHATSAPP AI] Messaging request detected.");
             Serial.println("[WHATSAPP AI] Generating message...");
 
+            const String timeContext = currentIndianTimeContext();
             const bool generated = reasoning.generateWhatsAppDraft(
                 transcript,
                 CONTACT_MAP,
                 CONTACT_COUNT,
                 CONTACT_PHONE_MAP,
                 CONTACT_PHONE_COUNT,
-                wa
+                wa,
+                timeContext.c_str()
             );
 
             if (!generated) {
@@ -638,12 +604,14 @@ void handleWakeEvent() {
         }
     } else {
         Serial.println("[REASONING] Processing request...");
+        const String timeContext = currentIndianTimeContext();
         GroqReasoning::Result result = reasoning.ask(
             transcript,
             DEVICE_MAP,
             DEVICE_COUNT,
             CONTACT_MAP,
-            CONTACT_COUNT
+            CONTACT_COUNT,
+            timeContext.c_str()
         );
 
         if (!reasoning.lastError().isEmpty()) {
