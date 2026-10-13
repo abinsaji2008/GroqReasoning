@@ -128,11 +128,13 @@ void handleWakeEvent() {
     if (WiFi.status() != WL_CONNECTED) {
         WiFi.reconnect();
         printResult("I'm not connected to Wi-Fi right now.");
+        startWakeNet();
         return;
     }
 
     if (!sttReady || !reasoningReady) {
         printResult("The voice assistant is not ready.");
+        startWakeNet();
         return;
     }
 
@@ -152,28 +154,18 @@ void handleWakeEvent() {
         return;
     }
 
-    GroqReasoning::Result result = reasoning.ask(
-        transcript,
-        DEVICE_MAP,
-        DEVICE_COUNT,
-        CONTACT_MAP,
-        CONTACT_COUNT
-    );
-
-    if (!reasoning.lastError().isEmpty()) {
-        Serial.print("[REASONING] HTTP status: ");
-        Serial.println(reasoning.lastHttpCode());
-        Serial.print("[REASONING] Error: ");
-        Serial.println(reasoning.lastError());
-    }
-
-    String finalResponse = result.response;
-    String finalAction = result.action;
-
     GroqReasoning::WhatsAppDraft wa;
+    String finalResponse;
+    String finalAction = "none";
 
-    if (reasoning.looksLikeWhatsAppRequest(transcript, CONTACT_MAP, CONTACT_COUNT)) {
-        bool generated = reasoning.generateWhatsAppDraft(
+    const bool whatsappRequest =
+        reasoning.looksLikeWhatsAppRequest(transcript, CONTACT_MAP, CONTACT_COUNT);
+
+    if (whatsappRequest) {
+        Serial.println("[WHATSAPP AI] Messaging request detected.");
+        Serial.println("[WHATSAPP AI] Generating message...");
+
+        const bool generated = reasoning.generateWhatsAppDraft(
             transcript,
             CONTACT_MAP,
             CONTACT_COUNT,
@@ -183,27 +175,50 @@ void handleWakeEvent() {
         );
 
         if (!generated) {
-            if (!finalResponse.isEmpty()) finalResponse += " ";
-            finalResponse += "I couldn't prepare the WhatsApp message: " + wa.error;
-        } else if (wa.send) {
+            Serial.print("[WHATSAPP AI] HTTP status: ");
+            Serial.println(reasoning.lastHttpCode());
+            Serial.print("[WHATSAPP AI] Error: ");
+            Serial.println(wa.error);
+            finalResponse = "I couldn't prepare the WhatsApp message: " + wa.error;
+        } else if (!wa.send) {
+            finalResponse = "What would you like me to say in the message?";
+        } else {
             GroqReasoning::WhatsAppConfig waConfig = {
                 SEED_EVOLUTION_API_URL,
                 SEED_EVOLUTION_INSTANCE,
                 SEED_EVOLUTION_API_KEY
             };
-            bool submitted = reasoning.sendWhatsAppMessage(wa, waConfig);
 
-            if (!finalResponse.isEmpty()) finalResponse += " ";
-
+            const bool submitted = reasoning.sendWhatsAppMessage(wa, waConfig);
             if (submitted) {
-                finalResponse += "WhatsApp message submitted to Evolution API for " + wa.contact + ".";
+                finalResponse = "WhatsApp message submitted to Evolution API for " + wa.contact + ".";
             } else {
-                finalResponse += "WhatsApp message could not be submitted: " + wa.error;
+                Serial.print("[WHATSAPP AI] Send HTTP status: ");
+                Serial.println(reasoning.lastHttpCode());
+                Serial.print("[WHATSAPP AI] Send error: ");
+                Serial.println(wa.error);
+                finalResponse = "WhatsApp message could not be submitted: " + wa.error;
             }
-        } else {
-            if (!finalResponse.isEmpty()) finalResponse += " ";
-            finalResponse += "What would you like me to say in the message?";
         }
+    } else {
+        Serial.println("[REASONING] Processing request...");
+        GroqReasoning::Result result = reasoning.ask(
+            transcript,
+            DEVICE_MAP,
+            DEVICE_COUNT,
+            CONTACT_MAP,
+            CONTACT_COUNT
+        );
+
+        if (!reasoning.lastError().isEmpty()) {
+            Serial.print("[REASONING] HTTP status: ");
+            Serial.println(reasoning.lastHttpCode());
+            Serial.print("[REASONING] Error: ");
+            Serial.println(reasoning.lastError());
+        }
+
+        finalResponse = result.response;
+        finalAction = result.action;
     }
 
     printResult(finalResponse, finalAction, &wa);
