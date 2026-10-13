@@ -165,3 +165,7 @@ The prototype uses `WiFiClientSecure::setInsecure()`; configure TLS certificate 
 ### Compatibility with older sketches
 
 Version 1.4.1 keeps compatibility overloads for sketches using `ContactPhoneMapping`, `begin(apiKey, model)`, `looksLikeWhatsAppRequest(transcript)`, and the four-argument `sendWhatsAppMessage(draft, apiBaseUrl, instanceName, apiKey)` form. Replace both `src/GroqReasoning.h` and `src/GroqReasoning.cpp` together when updating the library; mixing files from different versions can cause linker errors.
+
+### Groq GPT-OSS compatibility
+
+For `openai/gpt-oss-20b`, the library sets `include_reasoning=false` rather than passing `reasoning_format`, which the current Groq documentation lists as unsupported for GPT-OSS models. The voice-assistant example also prints the Groq HTTP status and error details to Serial when a request fails.
