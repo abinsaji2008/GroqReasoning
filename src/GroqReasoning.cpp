@@ -327,7 +327,7 @@ GroqReasoning::Result GroqReasoning::ask(const String &transcript,
 }
 
 String GroqReasoning::WhatsAppDraft::toJson() const {
-  DynamicJsonDocument doc(512 + contact.length() * 2 + number.length() * 2 +
+  DynamicJsonDocument doc(640 + contact.length() * 2 + number.length() * 2 +
                           text.length() * 2 + error.length() * 2);
   doc["send"] = send;
   doc["submitted"] = submitted;
