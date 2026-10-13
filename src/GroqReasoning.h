@@ -20,12 +20,6 @@ public:
     const char *number;
   };
 
-  struct WhatsAppConfig {
-    const char *apiUrl;
-    const char *instance;
-    const char *apiKey;
-  };
-
   struct WhatsAppDraft {
     bool send = false;
     bool submitted = false;
@@ -34,6 +28,12 @@ public:
     String text;
     String error;
     String toJson() const;
+  };
+
+  struct WhatsAppConfig {
+    const char *apiUrl;
+    const char *instance;
+    const char *apiKey;
   };
 
   struct Result {
@@ -72,6 +72,7 @@ private:
   int findContact(const String &person,
                   const ContactMapping *contacts,
                   size_t contactCount) const;
+
   bool isAllowedAction(const String &action,
                        const DeviceMapping *devices,
                        size_t deviceCount) const;
