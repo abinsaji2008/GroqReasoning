@@ -325,3 +325,250 @@ GroqReasoning::Result GroqReasoning::ask(const String &transcript,
   http.end();
   return result;
 }
+
+String GroqReasoning::WhatsAppDraft::toJson() const {
+  DynamicJsonDocument doc(512 + contact.length() * 2 + number.length() * 2 +
+                          text.length() * 2 + error.length() * 2);
+  doc["send"] = send;
+  doc["contact"] = contact;
+  doc["number"] = number;
+  doc["text"] = text;
+  doc["error"] = error;
+  String json;
+  serializeJson(doc, json);
+  return json;
+}
+
+bool GroqReasoning::looksLikeWhatsAppRequest(const String &transcript) const {
+  String text = transcript;
+  text.toLowerCase();
+
+  const bool explicitMessage =
+      text.indexOf("whatsapp") >= 0 ||
+      text.indexOf("message") >= 0 ||
+      text.indexOf("text ") >= 0;
+
+  const bool sendVerb =
+      text.indexOf("send ") >= 0 ||
+      text.indexOf("tell ") >= 0 ||
+      text.indexOf("inform ") >= 0 ||
+      text.indexOf("notify ") >= 0 ||
+      text.indexOf("write to ") >= 0 ||
+      text.indexOf("let ") >= 0;
+
+  return explicitMessage || sendVerb;
+}
+
+bool GroqReasoning::generateWhatsAppDraft(
+    const String &transcript,
+    const ContactMapping *contacts,
+    size_t contactCount,
+    const ContactNumberMapping *phoneNumbers,
+    size_t phoneNumberCount,
+    WhatsAppDraft &draft) {
+  draft = WhatsAppDraft();
+  lastError_ = "";
+  lastHttpCode_ = 0;
+
+  if (!initialized_) {
+    lastError_ = "Call begin(apiKey) before generateWhatsAppDraft().";
+    draft.error = lastError_;
+    return false;
+  }
+
+  String cleanTranscript = transcript;
+  cleanTranscript.trim();
+  if (cleanTranscript.isEmpty()) {
+    lastError_ = "Transcript is empty.";
+    draft.error = lastError_;
+    return false;
+  }
+
+  if (contacts == nullptr || contactCount == 0) {
+    lastError_ = "No WhatsApp contacts are configured.";
+    draft.error = lastError_;
+    return false;
+  }
+
+  if (WiFi.status() != WL_CONNECTED) {
+    lastError_ = "Wi-Fi is not connected.";
+    draft.error = lastError_;
+    return false;
+  }
+
+  String systemPrompt =
+      "Prepare WhatsApp message drafts from voice commands. Return ONLY a valid JSON object "
+      "with exactly three fields: send (boolean), contact (string), and text (string). "
+      "Set send=true only when the user explicitly requests an outbound WhatsApp message. "
+      "Use only one of the listed canonical contacts, and return that canonical name, not an alias. "
+      "Write a natural, concise message that preserves the user's intended meaning. Do not invent "
+      "facts, times, promises, or events. Never generate, request, or return a phone number. "
+      "Do not claim a message has already been sent. If the user did not ask to send a message, "
+      "or the requested recipient is not in the contact list, return "
+      "{\"send\":false,\"contact\":\"\",\"text\":\"\"}. The text field must contain only "
+      "the message body. Allowed contacts:\n";
+
+  for (size_t i = 0; i < contactCount; ++i) {
+    if (contacts[i].name == nullptr || contacts[i].name[0] == '\0') continue;
+    systemPrompt += "- Canonical name: \"";
+    systemPrompt += contacts[i].name;
+    systemPrompt += "\"";
+    if (contacts[i].aliases != nullptr && contacts[i].aliases[0] != '\0') {
+      systemPrompt += "; aliases: ";
+      systemPrompt += contacts[i].aliases;
+    }
+    systemPrompt += "\n";
+  }
+
+  WiFiClientSecure tls;
+  tls.setInsecure();
+
+  HTTPClient http;
+  http.setConnectTimeout(CONNECT_TIMEOUT_MS);
+  http.setTimeout(REQUEST_TIMEOUT_MS);
+
+  if (!http.begin(tls, CHAT_ENDPOINT)) {
+    lastError_ = "Could not initialize the Groq WhatsApp-draft request.";
+    draft.error = lastError_;
+    return false;
+  }
+
+  http.addHeader("Authorization", String("Bearer ") + apiKey_);
+  http.addHeader("Content-Type", "application/json");
+
+  DynamicJsonDocument requestDoc(
+      3072 + systemPrompt.length() * 2 + cleanTranscript.length() * 2);
+  requestDoc["model"] = DEFAULT_MODEL;
+  requestDoc["max_completion_tokens"] = 300;
+  JsonObject responseFormat = requestDoc.createNestedObject("response_format");
+  responseFormat["type"] = "json_object";
+
+  JsonArray messages = requestDoc.createNestedArray("messages");
+  JsonObject systemMessage = messages.createNestedObject();
+  systemMessage["role"] = "system";
+  systemMessage["content"] = systemPrompt;
+  JsonObject userMessage = messages.createNestedObject();
+  userMessage["role"] = "user";
+  userMessage["content"] = cleanTranscript;
+
+  String requestBody;
+  serializeJson(requestDoc, requestBody);
+
+  lastHttpCode_ = http.POST(requestBody);
+  String responseBody = http.getString();
+  http.end();
+
+  if (lastHttpCode_ < 200 || lastHttpCode_ >= 300) {
+    lastError_ = lastHttpCode_ <= 0
+        ? String("Groq request failed: ") + HTTPClient::errorToString(lastHttpCode_)
+        : String("Groq API returned HTTP ") + lastHttpCode_;
+    DynamicJsonDocument errorDoc(2048);
+    if (deserializeJson(errorDoc, responseBody) == DeserializationError::Ok) {
+      const char *message = errorDoc["error"]["message"] | "";
+      if (message[0] != '\0') {
+        lastError_ += ": ";
+        lastError_ += message;
+      }
+    }
+    draft.error = lastError_;
+    return false;
+  }
+
+  DynamicJsonDocument apiResponse(8192);
+  DeserializationError apiError = deserializeJson(apiResponse, responseBody);
+  if (apiError) {
+    lastError_ = String("Could not parse Groq response JSON: ") + apiError.c_str();
+    draft.error = lastError_;
+    return false;
+  }
+
+  String aiContent = apiResponse["choices"][0]["message"]["content"] | "";
+  aiContent.trim();
+  if (aiContent.isEmpty()) {
+    lastError_ = "Groq returned an empty WhatsApp-draft response.";
+    draft.error = lastError_;
+    return false;
+  }
+
+  DynamicJsonDocument messageDoc(2048);
+  DeserializationError messageError = deserializeJson(messageDoc, aiContent);
+  if (messageError) {
+    lastError_ = String("Could not parse generated WhatsApp draft: ") + messageError.c_str();
+    draft.error = lastError_;
+    return false;
+  }
+
+  if (!messageDoc["send"].is<bool>() ||
+      !messageDoc["contact"].is<const char *>() ||
+      !messageDoc["text"].is<const char *>()) {
+    lastError_ = "Generated WhatsApp draft has an invalid schema.";
+    draft.error = lastError_;
+    return false;
+  }
+
+  draft.send = messageDoc["send"].as<bool>();
+  draft.contact = messageDoc["contact"].as<String>();
+  draft.text = messageDoc["text"].as<String>();
+  draft.contact.trim();
+  draft.text.trim();
+
+  if (!draft.send) {
+    draft.contact = "";
+    draft.number = "";
+    draft.text = "";
+    return true;
+  }
+
+  const int contactIndex = findContact(draft.contact, contacts, contactCount);
+  if (contactIndex < 0) {
+    draft.send = false;
+    draft.contact = "";
+    draft.text = "";
+    lastError_ = "Groq selected a contact that is not in the allowlist.";
+    draft.error = lastError_;
+    return false;
+  }
+
+  draft.contact = contacts[contactIndex].name;
+  if (draft.text.isEmpty()) {
+    draft.send = false;
+    lastError_ = "Generated WhatsApp message is empty.";
+    draft.error = lastError_;
+    return false;
+  }
+
+  String configuredNumber;
+  if (phoneNumbers != nullptr) {
+    for (size_t i = 0; i < phoneNumberCount; ++i) {
+      if (phoneNumbers[i].name == nullptr || phoneNumbers[i].number == nullptr) continue;
+      if (normalizedName(String(phoneNumbers[i].name)) ==
+          normalizedName(draft.contact)) {
+        configuredNumber = String(phoneNumbers[i].number);
+        configuredNumber.trim();
+        break;
+      }
+    }
+  }
+
+  bool validPhoneNumber = configuredNumber.startsWith("+");
+  String digits = validPhoneNumber ? configuredNumber.substring(1) : String("");
+  if (digits.length() < 8 || digits.length() > 15) validPhoneNumber = false;
+  for (size_t i = 0; i < digits.length(); ++i) {
+    if (!isDigit(digits[i])) {
+      validPhoneNumber = false;
+      break;
+    }
+  }
+
+  if (!validPhoneNumber) {
+    draft.send = false;
+    draft.number = "";
+    lastError_ = "Configure a valid international phone number for " + draft.contact + ".";
+    draft.error = lastError_;
+    return false;
+  }
+
+  draft.number = configuredNumber;
+  return true;
+}
+
